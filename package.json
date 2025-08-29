@@ -1,10 +1,12 @@
 {
   "name": "version",
   "version": "1.0.0",
-  "description": "",
+  "description": "backend project",
+  "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node --env-file=.env --watch src/index.js",
+    "start": "node src/index.js"
   },
   "keywords": [
     "javascript",
@@ -13,7 +15,9 @@
   "author": "Shreyansh",
   "license": "ISC",
   "devDependencies": {
-    "nodemon": "^3.1.10",
-    "prettier": "^3.6.2"
+    "nodemon": "^2.0.22"
+  },
+  "dependencies": {
+    "mongoose": "^8.18.0"
   }
 }
