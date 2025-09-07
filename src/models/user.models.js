@@ -31,10 +31,6 @@ const userSchema = new Schema(
             type: String,  // cloudinary url will be used here
             required: true,
         },
-         avatar: {
-            type: String,  // cloudinary url will be used here
-            required: true,
-        },
          coverimage: {
             type: String,  // cloudinary url will be used here
         },
@@ -61,7 +57,7 @@ userSchema.pre("save", async function (next) {
     if(!this.isModified("password")) {
         return next();
     }
-    this.password = bcrypt.hashSync(this.password, 10);
+    this.password = await bcrypt.hashSync(this.password, 10);
     next();
 })
 
@@ -93,5 +89,5 @@ userSchema.methods.generateRefreshToken = function () { // no need to store any 
      )
 } // METHOD TO GENERATE REFRESH TOKEN
 
-export const User = mongoose.model("User", userSchema)
+export const User = mongoose.model("User", userSchema) // User model to create user collection in db
 
