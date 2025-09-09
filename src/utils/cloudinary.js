@@ -15,7 +15,8 @@ const uploadOnCloudinary = async (localFilePath) => { // async function to uploa
             resource_type: "auto" // jpeg, png, mp4, pdf
         })
         // file has been uploaded, now we can remove it from server
-        console.log("File uploaded to cloudinary successfully", response.url);
+        //console.log("File uploaded to cloudinary successfully", response.url);
+        fs.unlinkSync(localFilePath) // remove file from server
         return response;
      } catch (error) {
         fs.unlinkSync(localFilePath) // remove file from server
