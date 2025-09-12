@@ -3,13 +3,13 @@ import { apiError } from '../utils/apiError.js';
 import { User } from '../models/user.models.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
 import { apiResponse } from '../utils/apiResponse.js';
-
+import jwt from 'jsonwebtoken';
 
     const generateAccessAndRefreshToken = async (userId) => {
         try{
             const user = await User.findById(userId); // fetch user from db
-            const accessToken = user.generateRefreshToken() // generate access token
-            const refreshToken = user.generateAccessToken() // generate refresh token
+            const accessToken = user.generateAccessToken() // generate access token
+            const refreshToken = user.generateRefreshToken() // generate refresh token
 
             user.refreshToken = refreshToken; // store refresh token in db
             await user.save({ validateBeforeSave: false}); // to avoid password required error
@@ -54,12 +54,12 @@ import { apiResponse } from '../utils/apiResponse.js';
     //console.log("req.files", req.files);
 
     // get files from req.files
-    const avatarLocalPath = req.files?.avatar[0]?.path;
+    const avatarLocalPath = req.files?.avatar?.[0]?.path;
     //const coverimageLocalPath = req.files?.coverimage[0]?.path;
 
     let coverimageLocalPath;
-    if(req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0){
-        coverimageLocalPath = req.files.coverImage[0].path
+    if(req.files && Array.isArray(req.files.coverimage) && req.files.coverimage.length > 0){
+        coverimageLocalPath = req.files.coverimage[0].path
     }
 
     if(!avatarLocalPath){
@@ -113,7 +113,7 @@ const loginUser = asyncHandler(async (req, res) => {
     // send cookies
 
     const {username, email, password} = req.body;
-    if(!username || !email){ // at least one is required
+    if(!(username || email)){ // at least one is required
         throw new apiError(400, "Username or email is required to login");
     }
     const user = await User.findOne({
@@ -136,18 +136,20 @@ const loginUser = asyncHandler(async (req, res) => {
     // send cookies - refresh token in http only cookie
     const options = {
         httpOnly: true, // to prevent client side js to access the cookie
-        secure: true // to send cookie only on https
+        secure: false, // to send cookie only on https
+        sameSite: "lax"
     }
     return res
     .status(200) // status code 200 - ok
-    .cookie("refreshToken", refreshToken, options) // send refresh token in cookie
     .cookie("accessToken", accessToken, options) // send access token in cookie
+    .cookie("refreshToken", refreshToken, options) // send refresh token in cookie
+
     .json( // json response
         new apiResponse(200, // data
             {
                 user: loggedInUser,  // user details without password and refresh token
                 accessToken, // accessToken
-                refrehToken // refreshToken
+                refreshToken // refreshToken
             }, "User logged in successfully")
     )
 })
@@ -157,8 +159,8 @@ const logoutUser = asyncHandler(async (req, res) => {
     await User.findByIdAndUpdate(
         req.user._id,
         {
-            $set: {
-                refreshToken: undefined
+            $unset: {
+                refreshToken: 1
             }
         },
         {
@@ -167,7 +169,8 @@ const logoutUser = asyncHandler(async (req, res) => {
     )
     const options = {
         httpOnly: true,
-        secure: true
+        secure: false,
+        sameSite: "lax"
     }
     return res
     .status(200)
@@ -177,11 +180,57 @@ const logoutUser = asyncHandler(async (req, res) => {
 })
 
 
+const refreshAccessToken = asyncHandler(async (req, res) => 
+    {
+        const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken
+
+        if(!incomingRefreshToken){
+            throw new apiError(401, "Refresh token is missing");
+        }
+
+        // verify refresh token
+        try {
+            const decodedToken = jwt.verify(
+                incomingRefreshToken,
+                process.env.REFRESH_TOKEN_SECRET,
+            )
+    const user = User.findById(decodedToken?._id)
+    
+    if(!user){
+        throw new apiError(401, "User not found");
+    }
+    if(user?.refreshToken !== incomingRefreshToken){
+        throw new apiError(401, "Invalid refresh token");
+    }
+      const options = {
+        httpOnly: true,
+        secure: true
+      }
+      const {accessToken, newRefreshToken} = await generateAccessAndRefreshToken(user._id)
+    
+      return res
+      .status(200)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", newRefreshToken, options)
+      .json(
+        new apiResponse(
+            200, 
+            {accessToken, refreshToken: newRefreshToken},
+            "Access token refreshed successfully"
+        )
+    )
+        } catch (error) {
+            throw new apiError(401, "Invalid refresh token");
+        }
+
+})
+
 
 
 
 export {
     registerUser,
     loginUser,
-    logoutUser
+    logoutUser,
+    refreshAccessToken
 }
