@@ -320,6 +320,74 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     .status(200)
     .json(new apiResponse(200, user, "Cover image updated successfully"))
 })
+
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+    const {username} = req.params
+
+    if(!username?.trim()){
+        throw new apiError(400, "Username is required");
+    }
+    const channel = await User.aggregate([
+        {
+            $match : { // find user based on username
+                username : username?.toLowerCase()
+            }
+        },
+        {
+            $lookup : { // to get subscribers of this channel
+                from : "subscriptions",
+                localField : "_id",
+                foreignField : "channel",
+                as : "subscribers"
+            }
+        },
+        {
+            $lookup : { // to get channels to which this user is subscribed
+                from : "subscriptions",
+                localField : "_id",
+                foreignField : "subscriber",
+                as : "subscribedTo"
+            }
+        },
+        {
+            $addFields : { // to add new fields
+                subscribersCount : {
+                    $size : "$subscribers"
+                },
+                channelsSubscribedToCount : {
+                    $size : "$subscribedTo"
+                },
+                isSubscribed : {
+                    $cond : {
+                        if : {$in : [req.user?._id, "$subscribers.subscriber"]},
+                        then : true,
+                        else : false
+                    }
+                }
+            }
+        },
+        {
+            $project : { // to exclude some fields
+                fullname : 1,
+                username : 1,
+                subscribersCount : 1,
+                channelsSubscribedToCount : 1,
+                isSubscribed : 1,
+                avatar : 1,
+                coverimage : 1,
+                email : 1,
+            }
+        }
+    ])
+    if(!channel?.length){ // no channel found
+    throw new apiError(404, "Channel not found with this username");
+}
+    return res
+    .status(200)
+    .json(new apiResponse(200, channel[0], "Channel profile fetched successfully")) // only one channel will be there
+})
+
+
 export {
     registerUser,
     loginUser,
